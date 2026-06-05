@@ -1,0 +1,124 @@
+# HIP/ROCm build setup for GOMC
+
+# Add define flags for both CXX and HIP compilation
+# __HIP_PLATFORM_AMD__ is needed when CXX files include HIP headers
+add_compile_definitions(GOMC_CUDA USE_HIP __HIP_PLATFORM_AMD__)
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message("-- Debug build type detected for HIP")
+endif()
+
+# Set default HIP architectures if not specified
+if(NOT DEFINED CMAKE_HIP_ARCHITECTURES OR CMAKE_HIP_ARCHITECTURES STREQUAL "")
+    set(CMAKE_HIP_ARCHITECTURES "gfx90a")
+endif()
+message(STATUS "HIP architectures: ${CMAKE_HIP_ARCHITECTURES}")
+
+include_directories(src/GPU)
+
+set(GPU_NVT_flags "-DENSEMBLE=1")
+set(GPU_NVT_name "GOMC_GPU_NVT")
+set(GPU_GE_flags "-DENSEMBLE=2")
+set(GPU_GE_name "GOMC_GPU_GEMC")
+set(GPU_GC_flags "-DENSEMBLE=3")
+set(GPU_GC_name "GOMC_GPU_GCMC")
+set(GPU_NPT_flags "-DENSEMBLE=4")
+set(GPU_NPT_name "GOMC_GPU_NPT")
+
+set(CMAKE_HIP_STANDARD 17)
+set(CMAKE_HIP_STANDARD_REQUIRED true)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED true)
+
+# Mark CUDA sources as HIP language and enable RDC
+set_source_files_properties(${cudaSources} PROPERTIES LANGUAGE HIP)
+# Add RDC flags for device code linking across translation units
+# Use default visibility to allow device functions to be linked across TUs
+set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -fgpu-rdc")
+
+# Find hipCUB - use include dirs directly to avoid flag pollution from hip::device
+find_package(hipcub REQUIRED)
+# Get include dirs without propagating compile flags
+get_target_property(HIPCUB_INCLUDE_DIRS hip::hipcub INTERFACE_INCLUDE_DIRECTORIES)
+include_directories(${HIPCUB_INCLUDE_DIRS})
+# Find rocprim for includes
+find_package(rocprim REQUIRED)
+get_target_property(ROCPRIM_INCLUDE_DIRS roc::rocprim INTERFACE_INCLUDE_DIRECTORIES)
+include_directories(${ROCPRIM_INCLUDE_DIRS})
+
+#####################################
+if(ENSEMBLE_GPU_NVT)
+    add_executable(GPU_NVT ${cudaSources} ${cudaHeaders} ${sources}
+    ${headers} ${libHeaders} ${libSources})
+    target_compile_options(GPU_NVT
+       PUBLIC $<$<COMPILE_LANGUAGE:CXX>:${CMAKE_COMP_FLAGS}>
+              $<$<COMPILE_LANGUAGE:HIP>:${CMAKE_COMP_FLAGS}>)
+    target_link_options(GPU_NVT
+       PUBLIC ${CMAKE_LINK_FLAGS})
+    set_target_properties(GPU_NVT PROPERTIES
+        HIP_SEPARABLE_COMPILATION ON
+        HIP_ARCHITECTURES "${CMAKE_HIP_ARCHITECTURES}"
+        OUTPUT_NAME ${GPU_NVT_name})
+    target_compile_definitions(GPU_NVT PRIVATE ENSEMBLE=1)
+    target_link_libraries(GPU_NVT PRIVATE amdhip64)
+    if(MPI_FOUND)
+        target_link_libraries(GPU_NVT ${MPI_LIBRARIES})
+    endif()
+endif()
+
+if(ENSEMBLE_GPU_GEMC)
+    add_executable(GPU_GEMC ${cudaSources} ${cudaHeaders} ${sources}
+    ${headers} ${libHeaders} ${libSources})
+    target_compile_options(GPU_GEMC
+       PUBLIC $<$<COMPILE_LANGUAGE:CXX>:${CMAKE_COMP_FLAGS}>
+              $<$<COMPILE_LANGUAGE:HIP>:${CMAKE_COMP_FLAGS}>)
+    target_link_options(GPU_GEMC
+       PUBLIC ${CMAKE_LINK_FLAGS})
+    set_target_properties(GPU_GEMC PROPERTIES
+        HIP_SEPARABLE_COMPILATION ON
+        HIP_ARCHITECTURES "${CMAKE_HIP_ARCHITECTURES}"
+        OUTPUT_NAME ${GPU_GE_name})
+    target_compile_definitions(GPU_GEMC PRIVATE ENSEMBLE=2)
+    target_link_libraries(GPU_GEMC PRIVATE amdhip64)
+    if(MPI_FOUND)
+        target_link_libraries(GPU_GEMC ${MPI_LIBRARIES})
+    endif()
+endif()
+
+if(ENSEMBLE_GPU_GCMC)
+    add_executable(GPU_GCMC ${cudaSources} ${cudaHeaders} ${sources}
+    ${headers} ${libHeaders} ${libSources})
+    target_compile_options(GPU_GCMC
+       PUBLIC $<$<COMPILE_LANGUAGE:CXX>:${CMAKE_COMP_FLAGS}>
+              $<$<COMPILE_LANGUAGE:HIP>:${CMAKE_COMP_FLAGS}>)
+    target_link_options(GPU_GCMC
+       PUBLIC ${CMAKE_LINK_FLAGS})
+    set_target_properties(GPU_GCMC PROPERTIES
+        HIP_SEPARABLE_COMPILATION ON
+        HIP_ARCHITECTURES "${CMAKE_HIP_ARCHITECTURES}"
+        OUTPUT_NAME ${GPU_GC_name})
+    target_compile_definitions(GPU_GCMC PRIVATE ENSEMBLE=3)
+    target_link_libraries(GPU_GCMC PRIVATE amdhip64)
+    if(MPI_FOUND)
+        target_link_libraries(GPU_GCMC ${MPI_LIBRARIES})
+    endif()
+endif()
+
+if(ENSEMBLE_GPU_NPT)
+    add_executable(GPU_NPT ${cudaSources} ${cudaHeaders} ${sources}
+    ${headers} ${libHeaders} ${libSources})
+    target_compile_options(GPU_NPT
+       PUBLIC $<$<COMPILE_LANGUAGE:CXX>:${CMAKE_COMP_FLAGS}>
+              $<$<COMPILE_LANGUAGE:HIP>:${CMAKE_COMP_FLAGS}>)
+    target_link_options(GPU_NPT
+       PUBLIC ${CMAKE_LINK_FLAGS})
+    set_target_properties(GPU_NPT PROPERTIES
+        HIP_SEPARABLE_COMPILATION ON
+        HIP_ARCHITECTURES "${CMAKE_HIP_ARCHITECTURES}"
+        OUTPUT_NAME ${GPU_NPT_name})
+    target_compile_definitions(GPU_NPT PRIVATE ENSEMBLE=4)
+    target_link_libraries(GPU_NPT PRIVATE amdhip64)
+    if(MPI_FOUND)
+        target_link_libraries(GPU_NPT ${MPI_LIBRARIES})
+    endif()
+endif()
