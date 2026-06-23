@@ -4,6 +4,13 @@
 # __HIP_PLATFORM_AMD__ is needed when CXX files include HIP headers
 add_compile_definitions(GOMC_CUDA USE_HIP __HIP_PLATFORM_AMD__)
 
+# enable_language(HIP) in the top-level CMakeLists already resolved
+# CMAKE_HIP_ARCHITECTURES: it honors an explicit -DCMAKE_HIP_ARCHITECTURES,
+# otherwise auto-detects the host GPU(s) and errors on a no-GPU host. Collapse
+# to unique values before it is embedded in the custom --offload-arch link rule
+# below (auto-detection lists an arch once per GPU agent).
+list(REMOVE_DUPLICATES CMAKE_HIP_ARCHITECTURES)
+
 # On Windows with Clang, add WIN32 (source guards) and _USE_MATH_DEFINES (M_2_SQRTPI etc.)
 # Also override the HIP device-link rule: CMake 4.x Windows-Clang injects
 # -fuse-ld=lld-link into <LINK_FLAGS>, which the --hip-link device-link mode
@@ -20,10 +27,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     message("-- Debug build type detected for HIP")
 endif()
 
-# Set default HIP architectures if not specified
-if(NOT DEFINED CMAKE_HIP_ARCHITECTURES OR CMAKE_HIP_ARCHITECTURES STREQUAL "")
-    set(CMAKE_HIP_ARCHITECTURES "gfx90a")
-endif()
 message(STATUS "HIP architectures: ${CMAKE_HIP_ARCHITECTURES}")
 
 include_directories(src/GPU)
